@@ -238,7 +238,7 @@ class KaguyaTcPds3NaifSpiceDriver(Pds3Label,NaifSpice, LineScanner, Driver):
           The detector sample of the principle point
         """
         # Pixels are 0 based, not one based, so subtract 1
-        return spice.gdpool('INS{}_CENTER'.format(self.ikid), 0, 2)[0]-1
+        return spice.gdpool('INS{}_CENTER'.format(self.ikid), 0, 2)[0] - 1
 
     @property
     def _sensor_orientation(self):
@@ -501,3 +501,9 @@ class KaguyaTcPds3NaifSpiceDriver(Pds3Label,NaifSpice, LineScanner, Driver):
           ISIS sensor model version
         """
         return 1
+
+
+    @property
+    def light_time_correction(self):
+        return 'NONE'
+
