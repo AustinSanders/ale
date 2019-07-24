@@ -224,7 +224,7 @@ class KaguyaTcPds3NaifSpiceDriver(Pds3Label,NaifSpice, LineScanner, Driver):
         : int
           The detector line of the principle point
         """
-        return 0
+        return spice.gdpool('INS{}_CENTER'.format(self.ikid), 0, 2)[1] - .5
 
     @property
     def detector_center_sample(self):
@@ -238,7 +238,7 @@ class KaguyaTcPds3NaifSpiceDriver(Pds3Label,NaifSpice, LineScanner, Driver):
           The detector sample of the principle point
         """
         # Pixels are 0 based, not one based, so subtract 1
-        return spice.gdpool('INS{}_CENTER'.format(self.ikid), 0, 2)[0] - 1
+        return spice.gdpool('INS{}_CENTER'.format(self.ikid), 0, 2)[0] - .5
 
     @property
     def _sensor_orientation(self):
@@ -507,3 +507,5 @@ class KaguyaTcPds3NaifSpiceDriver(Pds3Label,NaifSpice, LineScanner, Driver):
     def light_time_correction(self):
         return 'NONE'
 
+
+    
