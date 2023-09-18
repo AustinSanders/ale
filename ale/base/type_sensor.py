@@ -580,4 +580,4 @@ class Cahvor():
           for it in range(3):
               self._position[0][it] = self.position[0][it] * radius2 / radius
 
-        return self._position, self._velocity, self._ephemeris_time
+        return self._position, self._velocity, self.ephemeris_time
