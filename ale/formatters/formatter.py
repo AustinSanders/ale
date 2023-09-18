@@ -5,7 +5,7 @@ from scipy.interpolate import interp1d, BPoly
 from networkx.algorithms.shortest_paths.generic import shortest_path
 
 from ale.transformation import FrameChain
-from ale.base.type_sensor import LineScanner, Framer, Radar, PushFrame
+from ale.base.type_sensor import LineScanner, Framer, Radar, PushFrame, Cahvor
 from ale.rotation import ConstantRotation, TimeDependentRotation
 from scipy.spatial.transform import Rotation
 
@@ -150,7 +150,7 @@ def to_isd(driver):
         meta_data['detector_sample_summing'] = driver.sample_summing
         meta_data['detector_line_summing'] = driver.line_summing
         meta_data['focal_length_model'] = {
-            'focal_length' : -1.0 * driver.focal_length
+            'focal_length' : driver.focal_length
         }
 
         meta_data['detector_center'] = {
@@ -163,38 +163,22 @@ def to_isd(driver):
         meta_data['starting_detector_line'] = driver.detector_start_line
         meta_data['starting_detector_sample'] = driver.detector_start_sample
 
+    if isinstance(driver, Cahvor):
+        # Reverse the frame order because ISIS orders frames as
+        # (destination, intermediate, ..., intermediate, source)
+        instrument_pointing['constant_frames'] = shortest_path(frame_chain, sensor_frame, destination_frame)
+        # Find rotation from ECEF to camera. See rover_frame_rotation() for an explanation.
+        roverToCamera = driver.cahvor_rotation_matrix
+        EcefToCamera = np.matmul(roverToCamera, EcefToRover)
+        instrument_pointing['constant_rotation'] = EcefToCamera.flatten()
+        meta_data['instrument_pointing'] = instrument_pointing
+
+
     j2000_rotation = frame_chain.compute_rotation(target_frame, 1)
 
-    # Reverse the frame order because ISIS orders frames as
-    # (destination, intermediate, ..., intermediate, source)
-    instrument_pointing['constant_frames'] = shortest_path(frame_chain, sensor_frame, destination_frame)
-    # Find rotation from ECEF to camera. See rover_frame_rotation() for an explanation.
-    roverToCamera = driver.cahvor_rotation_matrix
-    EcefToCamera = np.matmul(roverToCamera, EcefToRover)
-    instrument_pointing['constant_rotation'] = EcefToCamera.flatten()
-    meta_data['instrument_pointing'] = instrument_pointing
     
     instrument_position = {}
     positions, velocities, times = driver.sensor_position
-
-    # This is a bugfix for the fact that the left and right cameras are supposed
-    # to be on different locations on the rover. Get the CAHVOR center, and 
-    # convert it from that camera's coordinates to ECEF, then add it to the
-    # rover position.
-    camCtrEcef = np.matmul(np.linalg.inv(EcefToRover), driver.cahvor_center)[0]
-    positions[0] += camCtrEcef
-
-    # This is a fix for the fact that the height above datum can suddenly change
-    # by about 60 meters. If the user sets HEIGHT_ABOVE_DATUM then we will shift
-    # the position vertically to match this value.
-    key = 'HEIGHT_ABOVE_DATUM'
-    if key in os.environ:
-        x = positions[0]
-        datum_ht = 3396190
-        radius = np.sqrt(x[0]*x[0] + x[1]*x[1] + x[2]*x[2])
-        radius2 = float(os.environ[key]) + datum_ht
-        for it in range(3):
-            positions[0][it] = positions[0][it] * radius2 / radius
 
     instrument_position['spk_table_start_time'] = times[0]
     instrument_position['spk_table_end_time'] = times[-1]

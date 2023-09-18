@@ -474,22 +474,10 @@ class Cahvor():
         """
         return self.cahvor_camera_dict['C']  
     
+    
     @property
     def rover_frame_rotation(self):
-        """
-        Estimate the rotation X in the rover coordinates, such that the transform
-        from Mars ECEF coordinates to camera coordinates is given by
-        cahvor_rotation * X * EcefToRover
-        """
-
-        # Experiment with adjusting the rover to camera rotation. Need to look 
-        # at the MSL NAIF documentation and find the right way to do this.
-        r = Rotation.from_euler("zyx", [20, -20, 20], degrees=True)
-        X = "-0.13005758  0.79616099  0.59095196 -0.46804661 -0.57473784  0.67126629  0.87404766 -0.1893059   0.44742102"
-        X = np.array(X.split(),  dtype=np.float64)
-        X = X.reshape(3, 3)
-        X = np.matmul(r.as_matrix(), X)
-        return X
+        raise NotImplementedError()
 
     @property
     def frame_chain(self):
@@ -558,3 +546,38 @@ class Cahvor():
           Focal length of a cahvor model instrument
         """
         return self.focal_length/self.compute_h_s()
+    
+
+    @property
+    def ecef_to_rover(self):
+        frame_chain = self.frame_chain
+        target_frame = self.target_frame_id
+
+        source_frame, _, _ = frame_chain.last_time_dependent_frame_between(target_frame, 1)
+        time_dependent_rotation = frame_chain.compute_rotation(1, source_frame)
+
+        # Find the rotation from ECEF to the rover frame
+        EcefToRover = Rotation.from_quat(time_dependent_rotation.quats).as_matrix()
+        # It was found empirically that an additional rotation is needed
+        # TODO(oalexan1): Must read the NAIF doc and do an honest job.
+        EcefToRover = np.matmul(self.rover_frame_rotation, EcefToRover)
+        return EcefToRover
+
+
+    @property
+    def sensor_position(self):
+        pos, _, _= super().sensor_position
+        camCtrEcef = np.matmul(np.linalg.inv(self.ecef_to_rover), self.cahvor_center)[0]
+        pos[0] += camCtrEcef
+        self._position = pos
+
+        key = 'HEIGHT_ABOVE_DATUM'
+        if key in os.environ:
+          x = pos[0]
+          datum_ht = 3396190
+          radius = np.sqrt(x[0]*x[0] + x[1]*x[1] + x[2]*x[2])
+          radius2 = float(os.environ[key]) + datum_ht
+          for it in range(3):
+              self._position[0][it] = self.position[0][it] * radius2 / radius
+
+        return self._position, self._velocity, self._ephemeris_time

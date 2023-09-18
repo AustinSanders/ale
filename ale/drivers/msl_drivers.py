@@ -1,3 +1,4 @@
+import os
 import numpy as np
 import spiceypy as spice
 
@@ -7,6 +8,7 @@ from ale.base.type_sensor import Framer
 from ale.base.type_distortion import CahvorDistortion
 from ale.base.type_sensor import Cahvor
 from ale.base.base import Driver
+from ale.rotation import Rotation
 
 class MslMastcamPds3NaifSpiceDriver(Cahvor, Framer, Pds3Label, NaifSpice, CahvorDistortion, Driver):
     """
@@ -153,3 +155,25 @@ class MslMastcamPds3NaifSpiceDriver(Cahvor, Framer, Pds3Label, NaifSpice, Cahvor
           ISIS sensor model version
         """
         return 1
+
+    @property
+    def focal_length(self):
+        return -1 * super().focal_length
+
+
+    @property
+    def rover_frame_rotation(self):
+        """
+        Estimate the rotation X in the rover coordinates, such that the transform
+        from Mars ECEF coordinates to camera coordinates is given by
+        cahvor_rotation * X * EcefToRover
+        """
+
+        # Experiment with adjusting the rover to camera rotation. Need to look 
+        # at the MSL NAIF documentation and find the right way to do this.
+        r = Rotation.from_euler("zyx", [20, -20, 20], degrees=True)
+        X = "-0.13005758  0.79616099  0.59095196 -0.46804661 -0.57473784  0.67126629  0.87404766 -0.1893059   0.44742102"
+        X = np.array(X.split(),  dtype=np.float64)
+        X = X.reshape(3, 3)
+        X = np.matmul(r.as_matrix(), X)
+        return X
